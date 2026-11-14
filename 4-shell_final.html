@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Find It: Hidden Objects</title>
+<style>html,body{margin:0;height:100%;background:#0e1a26}body{display:grid;place-items:center;color:#7f9bb3;font:600 15px/1.4 system-ui,sans-serif}</style>
+</head>
+<body>
+<div>FIND IT &middot; Loading&hellip;</div>
+<script>
+fetch('3-app.html', {cache:'no-cache'})
+  .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+  .then(t => { document.open(); document.write(t); document.close(); })
+  .catch(e => { document.body.firstElementChild.textContent = 'Load failed (' + e.message + ') - tap to retry'; document.body.onclick = () => location.reload(); });
+</script>
+</body>
+</html>
