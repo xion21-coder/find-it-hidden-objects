@@ -9,10 +9,15 @@
 <body>
 <div>FIND IT &middot; Loading&hellip;</div>
 <script>
-fetch('4-5-app.html', {cache:'no-cache'})
-  .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
-  .then(t => { document.open(); document.write(t); document.close(); })
-  .catch(e => { document.body.firstElementChild.textContent = 'Load failed (' + e.message + ') - tap to retry'; document.body.onclick = () => location.reload(); });
+Promise.all([
+  fetch('1-payload_app.html', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
+  fetch('2-pack_ext.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+]).then(([app, ext]) => {
+  document.open();
+  document.write(app);
+  document.write('<scr' + 'ipt>' + ext + '<\/scr' + 'ipt>');
+  document.close();
+}).catch(e => { document.body.firstElementChild.textContent = 'Load failed (' + e.message + ') - tap to retry'; document.body.onclick = () => location.reload(); });
 </script>
 </body>
 </html>
