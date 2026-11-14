@@ -1,0 +1,1892 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#172b35">
+<title>Find It: Hidden Objects</title>
+
+<style>
+  :root {
+    --bg: #172b35;
+    --panel: rgba(24, 43, 51, .96);
+    --gold: #f5ce79;
+    --cream: #fff5df;
+    --muted: #aab9b9;
+    --green: #78c69a;
+    --red: #fa625c;
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--cream);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    border: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  #game {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* Compact top HUD */
+  .topbar {
+    z-index: 5;
+    flex-shrink: 0;
+    min-height: 60px;
+    padding: max(9px, env(safe-area-inset-top)) 14px 9px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--panel);
+    border-bottom: 1px solid rgba(255,255,255,.1);
+  }
+
+  .brand {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .brand strong {
+    font-size: 15px;
+    letter-spacing: 1.5px;
+    color: var(--gold);
+  }
+
+  .brand small {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  .hud {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hud-item {
+    min-width: 65px;
+    padding: 6px 9px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.07);
+    text-align: center;
+  }
+
+  .hud-item small {
+    display: block;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .hud-item strong {
+    font-size: 14px;
+    color: var(--gold);
+  }
+
+  /* Main illustration viewport */
+  #viewport {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    background: #101d24;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  #viewport.dragging {
+    cursor: grabbing;
+  }
+
+  #world {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1600px;
+    height: 1100px;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  #scene {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* Found-object rings */
+  .found-ring {
+    position: absolute;
+    border: 5px solid var(--red);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(255,255,255,.85),
+                0 0 18px rgba(255,65,65,.8);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: ringAppear .35s ease-out;
+    z-index: 2;
+  }
+
+  @keyframes ringAppear {
+    from { transform: translate(-50%,-50%) scale(.3); opacity: 0; }
+    to { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+  }
+
+  .hint-ring {
+    position: absolute;
+    border: 5px solid #fff16c;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 3;
+    animation: hintPulse 1s ease-in-out infinite;
+  }
+
+  @keyframes hintPulse {
+    0%,100% {
+      transform: translate(-50%,-50%) scale(.85);
+      opacity: 1;
+      box-shadow: 0 0 5px #fff16c;
+    }
+    50% {
+      transform: translate(-50%,-50%) scale(1.4);
+      opacity: .35;
+      box-shadow: 0 0 24px #fff16c;
+    }
+  }
+
+  .wrong-tap {
+    position: absolute;
+    pointer-events: none;
+    color: #ffddd5;
+    font-size: 25px;
+    font-weight: bold;
+    text-shadow: 0 2px 5px #642b26;
+    animation: wrongFloat .7s ease-out forwards;
+    z-index: 4;
+  }
+
+  @keyframes wrongFloat {
+    from { opacity: 1; transform: translate(-50%,0) scale(1); }
+    to { opacity: 0; transform: translate(-50%,-35px) scale(.8); }
+  }
+
+  #viewport.shake {
+    animation: shake .25s ease;
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+  }
+
+  /* Zoom controls */
+  .view-controls {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    z-index: 4;
+  }
+
+  .view-btn {
+    width: 39px;
+    height: 39px;
+    border-radius: 12px;
+    background: rgba(24,43,51,.86);
+    color: var(--cream);
+    font-size: 21px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  }
+
+  .view-btn:active {
+    background: #46636a;
+  }
+
+  /* Bottom target list */
+  .bottom-panel {
+    z-index: 5;
+    flex-shrink: 0;
+    background: var(--panel);
+    padding: 9px 12px max(10px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255,255,255,.1);
+  }
+
+  .bottom-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .bottom-heading strong {
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    color: var(--gold);
+  }
+
+  .bottom-heading span {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  #targets {
+    display: flex;
+    gap: 9px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 3px;
+    scrollbar-width: thin;
+    scrollbar-color: #637c78 transparent;
+    touch-action: pan-x;
+  }
+
+  .target {
+    flex-shrink: 0;
+    width: 65px;
+    min-height: 75px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: rgba(255,255,255,.075);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 12px;
+    position: relative;
+    transition: background .2s;
+  }
+
+  .target .emoji {
+    font-size: 25px;
+    line-height: 1.2;
+  }
+
+  .target .obj-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto 2px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.35);
+  }
+
+  .target .name {
+    font-size: 10px;
+    color: var(--cream);
+    white-space: nowrap;
+  }
+
+  .target.found {
+    background: rgba(91,174,126,.2);
+    border-color: rgba(120,198,154,.5);
+    opacity: .65;
+  }
+
+  .target.found .name {
+    text-decoration: line-through;
+    color: var(--green);
+  }
+
+  .target .check {
+    position: absolute;
+    right: 4px;
+    top: 3px;
+    font-size: 12px;
+    color: var(--green);
+    font-weight: bold;
+  }
+
+  .bottom-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    gap: 10px;
+  }
+
+  .instruction {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .hint-btn {
+    padding: 9px 16px;
+    border-radius: 11px;
+    background: #bd8544;
+    color: #fff9eb;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 3px 0 #81572e;
+  }
+
+  .hint-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #81572e;
+  }
+
+  .hint-btn:disabled {
+    opacity: .4;
+    cursor: default;
+  }
+
+  /* Overlays */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(9,20,26,.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(6px);
+  }
+
+  .dialog {
+    width: min(350px, 100%);
+    padding: 28px 22px;
+    text-align: center;
+    border: 1px solid rgba(245,206,121,.35);
+    border-radius: 22px;
+    background: linear-gradient(145deg,#29444a,#192e38);
+    box-shadow: 0 15px 50px rgba(0,0,0,.4);
+  }
+
+  .dialog .big-icon {
+    font-size: 56px;
+    margin-bottom: 10px;
+  }
+
+  .dialog h1 {
+    color: var(--gold);
+    margin: 0 0 9px;
+    font-size: 25px;
+  }
+
+  .dialog p {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 0 0 22px;
+  }
+
+  .primary-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg,#f0c66d,#d89b48);
+    color: #283a38;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .secondary-btn {
+    margin-top: 10px;
+    padding: 10px;
+    width: 100%;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  .confetti {
+    position: absolute;
+    top: -15px;
+    font-size: 20px;
+    pointer-events: none;
+    animation: confettiFall 2.8s linear forwards;
+  }
+
+  @keyframes confettiFall {
+    to {
+      transform: translateY(110vh) rotate(720deg);
+      opacity: 0;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .brand strong { font-size: 13px; }
+    .hud-item { min-width: 55px; padding: 5px 6px; }
+    .target { width: 59px; }
+    .instruction { font-size: 9px; }
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    .topbar { min-height: 46px; padding-top: 4px; padding-bottom: 4px; }
+    .bottom-panel { padding-top: 5px; padding-bottom: 5px; }
+    .bottom-heading { margin-bottom: 4px; }
+    .target { min-height: 55px; width: 58px; }
+    .target .emoji { font-size: 19px; }
+    .target .name { font-size: 9px; }
+    .bottom-actions { margin-top: 4px; }
+    .hint-btn { padding: 6px 12px; }
+  }
+
+  /* XiON Play splash */
+  #splashOverlay {
+    position: fixed; inset: 0; z-index: 60;
+    background: linear-gradient(160deg,#101d24,#1d3540);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; transition: opacity .5s;
+  }
+  #splashOverlay.fade { opacity: 0; pointer-events: none; }
+  #splashOverlay .xmark {
+    width: 92px; height: 92px; border-radius: 24px;
+    background: linear-gradient(135deg,#f0c66d,#d89b48);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 52px; font-weight: 900; color: #172b35;
+    box-shadow: 0 10px 40px rgba(240,198,109,.35);
+    animation: splashPop .6s ease-out;
+  }
+  @keyframes splashPop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  #splashOverlay .brandname { color: #fff5df; font-size: 26px; letter-spacing: 4px; font-weight: 800; }
+  #splashOverlay .buildtag { position: absolute; right: 10px; bottom: 8px; color: rgba(255,245,223,.28); font-size: 9px; }
+  #scene { user-select: none; -webkit-user-drag: none; }
+
+  /* Settings gear in the top bar */
+  .icon-btn {
+    align-self: center; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.07); color: var(--cream);
+    border-radius: 12px; font-size: 18px; padding: 8px 10px; cursor: pointer;
+  }
+  .icon-btn:active { transform: scale(.94); }
+  /* Settings rows */
+  .setting-row {
+    display: flex; justify-content: space-between; align-items: center;
+    width: 100%; padding: 12px 4px; border-bottom: 1px solid rgba(255,255,255,.09);
+    color: var(--cream); font-size: 15px; cursor: pointer;
+  }
+  .setting-row.placeholder { opacity: .55; }
+  .toggle {
+    min-width: 64px; padding: 6px 12px; border-radius: 999px; border: none;
+    background: var(--gold); color: #172b35; font-weight: 800; cursor: pointer;
+  }
+  /* Level chips on the start screen */
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 4px 0 12px; }
+  .chip {
+    min-width: 46px; padding: 9px 10px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.08);
+    color: var(--cream); font-weight: 800; font-size: 15px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .chip small { font-weight: 400; font-size: 10px; color: var(--muted); }
+  .chip.locked { opacity: .45; cursor: default; }
+  .chip.current { border-color: var(--gold); }
+  /* Tap ping: every in-scene tap registers visibly */
+  .tap-ping {
+    position: absolute; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.9); transform: translate(-50%,-50%);
+    pointer-events: none; z-index: 3; animation: tapPing .45s ease-out forwards;
+  }
+  @keyframes tapPing {
+    from { opacity: .9; scale: .6; } to { opacity: 0; scale: 2.6; }
+  }
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 110px; transform: translateX(-50%) translateY(8px);
+    background: rgba(9,20,26,.92); color: var(--cream); padding: 10px 18px;
+    border-radius: 999px; font-size: 14px; opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s; z-index: 70; max-width: 86%; text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hint-btn.empty { opacity: .75; border-style: dashed; }
+</style>
+</head>
+
+<body>
+<div id="game">
+
+  <header class="topbar">
+    <div class="brand">
+      <strong>🔍 FIND IT</strong>
+      <small>HIDDEN OBJECTS</small>
+    </div>
+
+    <div class="hud">
+      <div class="hud-item">
+        <small>LEVEL</small>
+        <strong id="levelDisplay">01</strong>
+      </div>
+      <div class="hud-item">
+        <small>FOUND</small>
+        <strong id="foundDisplay">0/6</strong>
+      </div>
+      <div class="hud-item">
+        <small>HINTS</small>
+        <strong id="hintDisplay">3</strong>
+      </div>
+    </div>
+    <button class="icon-btn" id="settingsButton" aria-label="Settings">⚙️</button>
+  </header>
+
+  <main id="viewport">
+    <div id="world">
+      <img id="scene" src="" alt="Hidden object scene" draggable="false">
+    </div>
+
+    <div class="view-controls">
+      <button class="view-btn" id="zoomIn" aria-label="Zoom in">+</button>
+      <button class="view-btn" id="zoomOut" aria-label="Zoom out">−</button>
+      <button class="view-btn" id="resetView" aria-label="Reset view">⌖</button>
+    </div>
+  </main>
+
+  <section class="bottom-panel">
+    <div class="bottom-heading">
+      <strong>🔍 FIND THESE OBJECTS</strong>
+      <span id="remainingText">6 objects remaining</span>
+    </div>
+
+    <div id="targets"></div>
+
+    <div class="bottom-actions">
+      <span class="instruction" id="footerHint"></span>
+      <button class="hint-btn" id="hintButton">💡 <span id="hintLabel">HINT</span> <span id="hintButtonCount">3</span></button>
+    </div>
+  </section>
+
+
+  <!-- Settings -->
+  <div class="overlay hidden" id="settingsOverlay">
+    <div class="dialog">
+      <h1 id="settingsTitle">Settings</h1>
+      <div class="setting-row"><span id="soundLabel">Sound</span><button class="toggle" id="soundToggle">ON</button></div>
+      <div class="setting-row"><span id="vibrationLabel">Vibration</span><button class="toggle" id="vibrationToggle">ON</button></div>
+      <div class="setting-row placeholder" id="removeAdsRow"><span id="removeAdsLabel">Remove ads</span><span>🛠️</span></div>
+      <button class="primary-btn" id="settingsClose">OK</button>
+    </div>
+  </div>
+  <div id="toast"></div>
+
+  <!-- XiON Play splash (always first) -->
+  <div id="splashOverlay">
+    <div class="xmark">X</div>
+    <div class="brandname">XiON Play</div>
+    <div class="buildtag">vc3 · 14/11</div>
+  </div>
+
+  <!-- One-time terms -->
+  <div class="overlay hidden" id="termsOverlay">
+    <div class="dialog">
+      <div class="big-icon">📜</div>
+      <h1 id="termsTitle">Terms</h1>
+      <p id="termsBody"></p>
+      <button class="primary-btn" id="termsAccept">OK</button>
+    </div>
+  </div>
+
+  <!-- Intro overlay -->
+  <div class="overlay" id="introOverlay">
+    <div class="dialog">
+      <div class="big-icon">🧭</div>
+      <h1 id="introTitle">Find It: Hidden Objects</h1>
+      <p id="introBody"></p>
+      <div id="levelChips" class="chips"></div>
+      <button class="primary-btn" id="startButton">START</button>
+    </div>
+  </div>
+
+  <!-- Level completion overlay -->
+  <div class="overlay hidden" id="completeOverlay">
+    <div class="dialog">
+      <div class="big-icon">🏆</div>
+      <h1 id="completeTitle">Wonderful!</h1>
+      <p id="completeMessage">
+        You discovered every hidden object!
+      </p>
+      <button class="primary-btn" id="nextButton">NEXT LEVEL →</button>
+      <button class="secondary-btn" id="replayButton"></button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   LEVEL DATA
+
+   Coordinates are expressed in image-relative percentages:
+   x and y: 0–100
+   radius: percentage of the image width
+
+   Add additional levels by appending another level object.
+   Every object has a name, icon, x, y, and radius.
+   ========================================================= */
+
+const LEVELS = [
+  {
+    name: "Attic",
+    ko: "다락방",
+    img: "clevel1.jpg",
+    w: 1086,
+    h: 1448,
+    hints: 3,
+    objects: [
+      { name: "Crown",       ko: "왕관",      img: "icon_l1_0.jpg", icon: "👑", x:  9.0, y: 16.0, radius: 4.5 },
+      { name: "Key",         ko: "열쇠",      img: "icon_l1_1.jpg", icon: "🔑", x: 18.0, y: 28.0, radius: 3.5 },
+      { name: "Butterfly",   ko: "나비",      img: "icon_l1_2.jpg", icon: "🦋", x: 58.0, y:  9.0, radius: 4.0 },
+      { name: "Rubber Duck", ko: "오리 인형", img: "icon_l1_3.jpg", icon: "🦆", x: 66.0, y: 51.0, radius: 4.0 },
+      { name: "Apple",       ko: "사과",      img: "icon_l1_4.jpg", icon: "🍎", x:  7.0, y: 70.0, radius: 4.5 },
+      { name: "Scissors",    ko: "가위",      img: "icon_l1_5.jpg", icon: "✂️", x: 66.0, y: 84.0, radius: 4.0 }
+    ]
+  },
+  {
+    name: "Market",
+    ko: "시장",
+    img: "clevel2.jpg",
+    w: 1086,
+    h: 1448,
+    hints: 3,
+    objects: [
+      { name: "Milk Bottle",   ko: "우유병",     img: "icon_l2_0.jpg", icon: "🍼", x: 21.0, y: 47.0, radius: 4.0 },
+      { name: "Straw Hat",     ko: "밀짚모자",   img: "icon_l2_1.jpg", icon: "👒", x: 73.0, y: 70.0, radius: 5.0 },
+      { name: "Honey Jar",     ko: "꿀단지",     img: "icon_l2_2.jpg", icon: "🍯", x: 28.0, y: 56.0, radius: 4.0 },
+      { name: "Frog",          ko: "개구리",     img: "icon_l2_3.jpg", icon: "🐸", x: 34.0, y: 73.0, radius: 4.0 },
+      { name: "Bell",          ko: "종",         img: "icon_l2_4.jpg", icon: "🔔", x: 29.0, y:  9.0, radius: 3.5 },
+      { name: "Red Lantern",   ko: "빨간 등롱",  img: "icon_l2_5.jpg", icon: "🏮", x: 93.0, y: 15.0, radius: 4.0 },
+      { name: "Goldfish Bowl", ko: "금붕어 어항", img: "icon_l2_6.jpg", icon: "🐠", x: 93.0, y: 55.0, radius: 4.5 }
+    ]
+  },
+  {
+    name: "Beach",
+    ko: "해변",
+    img: "clevel3.jpg",
+    w: 1086,
+    h: 1448,
+    hints: 3,
+    objects: [
+      { name: "Pineapple",  ko: "파인애플",   img: "icon_l3_0.jpg", icon: "🍍", x:  5.0, y: 47.0, radius: 4.5 },
+      { name: "Kite",       ko: "연",         img: "icon_l3_1.jpg", icon: "🪁", x: 72.0, y:  5.0, radius: 4.5 },
+      { name: "Seagull",    ko: "갈매기",     img: "icon_l3_2.jpg", icon: "🐦", x: 30.0, y: 20.0, radius: 4.5 },
+      { name: "Sunglasses", ko: "선글라스",   img: "icon_l3_3.jpg", icon: "🕶️", x: 15.0, y: 57.0, radius: 4.0 },
+      { name: "Ice Cream",  ko: "아이스크림", img: "icon_l3_4.jpg", icon: "🍦", x: 77.0, y: 42.0, radius: 4.0 },
+      { name: "Bucket",     ko: "양동이",     img: "icon_l3_5.jpg", icon: "🪣", x: 56.0, y: 54.0, radius: 4.5 },
+      { name: "Starfish",   ko: "불가사리",   img: "icon_l3_6.jpg", icon: "⭐", x: 75.0, y: 60.0, radius: 4.5 },
+      { name: "Crab",       ko: "게",         img: "icon_l3_7.jpg", icon: "🦀", x: 89.0, y: 56.0, radius: 4.5 }
+    ]
+  }
+];
+
+/* =========================================================
+   GAME CONFIGURATION
+   ========================================================= */
+
+let IMAGE_WIDTH = 1600;
+let IMAGE_HEIGHT = 1100;
+const MAX_ZOOM = 4;
+const MIN_ZOOM = 1;
+
+const viewport = document.getElementById("viewport");
+const world = document.getElementById("world");
+const targetsEl = document.getElementById("targets");
+
+const levelDisplay = document.getElementById("levelDisplay");
+const foundDisplay = document.getElementById("foundDisplay");
+const hintDisplay = document.getElementById("hintDisplay");
+const remainingText = document.getElementById("remainingText");
+
+const hintButton = document.getElementById("hintButton");
+const hintButtonCount = document.getElementById("hintButtonCount");
+
+const introOverlay = document.getElementById("introOverlay");
+const completeOverlay = document.getElementById("completeOverlay");
+
+let levelIndex = 0;
+let level;
+let found = new Set();
+let hintsRemaining = 3;
+let hintElement = null;
+let started = false;
+let completed = false;
+
+let baseScale = 1;
+let zoom = 1;
+let panX = 0;
+let panY = 0;
+
+let pointers = new Map();
+let gesture = null;
+let lastTapTime = 0;
+
+let audioContext = null;
+
+
+/* =========================================================
+   I18N (auto: Korean / English)
+   ========================================================= */
+const LANG = (navigator.language || "en").toLowerCase().startsWith("ko") ? "ko" : "en";
+const T = {
+  en: {
+    remaining: n => n + " objects remaining",
+    allFound: "All objects found!",
+    introTitle: "Find It: Hidden Objects",
+    introBody: "Explore a big beautiful picture, pinch to zoom in, and tap every hidden object on the list. Use a hint when you are stuck!",
+    start: "START",
+    completeTitle: "Wonderful!",
+    completeLast: "All Clear!",
+    completeMsg: n => "You found all " + n + " hidden objects!",
+    completeLastMsg: "You found every hidden object. You are a true Find It explorer!",
+    next: "NEXT LEVEL →",
+    again: "PLAY AGAIN ↻",
+    replay: "Replay this level",
+    hint: "HINT",
+    footer: "Drag to explore · Pinch to zoom · Tap to find",
+    on: "ON", off: "OFF",
+    settings: "Settings", sound: "Sound", vibration: "Vibration",
+    removeAds: "Remove ads (coming soon)",
+    comingSoon: "Coming soon",
+    hintRefill: "No hints left. Refill with an ad (coming soon)",
+    record: s => "Time " + s + "s",
+    termsTitle: "Terms & Privacy",
+    termsBody: "By playing you agree to the XiON Play terms and privacy policy. Contact: hohenco21@gmail.com",
+    accept: "AGREE"
+  },
+  ko: {
+    remaining: n => "남은 물건 " + n + "개",
+    allFound: "모두 찾았어요!",
+    introTitle: "파인드 잇: 숨은물건 찾기",
+    introBody: "커다란 그림 속에 숨은 물건을 모두 찾아보세요. 두 손가락으로 확대하고 옮기면서 목록의 물건을 누르면 됩니다. 막히면 힌트를 써보세요!",
+    start: "시작하기",
+    completeTitle: "참 잘했어요!",
+    completeLast: "올 클리어!",
+    completeMsg: n => "숨은 물건 " + n + "개를 모두 찾았어요!",
+    completeLastMsg: "모든 그림의 숨은 물건을 전부 찾았어요. 당신은 진정한 탐험가!",
+    next: "다음 레벨 →",
+    again: "다시 하기 ↻",
+    replay: "이 레벨 다시하기",
+    hint: "힌트",
+    footer: "드래그로 이동 · 두 손가락 확대 · 물건을 눌러 찾기",
+    on: "켜짐", off: "꺼짐",
+    settings: "설정", sound: "사운드", vibration: "진동",
+    removeAds: "광고 제거 (준비 중)",
+    comingSoon: "준비 중입니다",
+    hintRefill: "힌트를 다 썼어요. 광고로 충전 (준비 중)",
+    record: s => "기록 " + s + "초",
+    termsTitle: "이용약관 및 개인정보",
+    termsBody: "게임을 시작하면 XiON Play 이용약관과 개인정보 처리방침에 동의하게 됩니다. 문의: hohenco21@gmail.com",
+    accept: "동의"
+  }
+}[LANG];
+
+function objName(o) { return LANG === "ko" ? (o.ko || o.name) : o.name; }
+
+/* =========================================================
+   AUDIO
+   Web Audio API: no external sound files required.
+   ========================================================= */
+
+function initAudio() {
+  if (!audioContext) {
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext;
+
+    if (AudioContextClass) {
+      audioContext = new AudioContextClass();
+    }
+  }
+
+  if (audioContext && audioContext.state === "suspended") {
+    audioContext.resume();
+  }
+}
+
+function playFoundSound() {
+  if (!audioContext) return;
+
+  const now = audioContext.currentTime;
+
+  // A soft two-note discovery chime.
+  [660, 880].forEach((frequency, index) => {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+
+    const start = now + index * .11;
+
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(.12, start + .025);
+    gain.gain.exponentialRampToValueAtTime(.001, start + .3);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start(start);
+    oscillator.stop(start + .32);
+  });
+}
+
+function playWrongSound() {
+  if (!audioContext) return;
+
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(190, audioContext.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(
+    110,
+    audioContext.currentTime + .12
+  );
+
+  gain.gain.setValueAtTime(.07, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(
+    .001,
+    audioContext.currentTime + .15
+  );
+
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + .16);
+}
+
+function playCelebrationSound() {
+  if (!audioContext) return;
+
+  [523, 659, 784, 1047].forEach((frequency, index) => {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    const start = audioContext.currentTime + index * .14;
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+
+    gain.gain.setValueAtTime(.001, start);
+    gain.gain.linearRampToValueAtTime(.12, start + .03);
+    gain.gain.exponentialRampToValueAtTime(.001, start + .35);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start(start);
+    oscillator.stop(start + .36);
+  });
+}
+
+/* =========================================================
+   VIEWPORT AND TRANSFORM MANAGEMENT
+   ========================================================= */
+
+function calculateBaseScale() {
+  const rect = viewport.getBoundingClientRect();
+
+  baseScale = Math.min(
+    rect.width / IMAGE_WIDTH,
+    rect.height / IMAGE_HEIGHT
+  );
+
+  applyBounds();
+  renderTransform();
+}
+
+function applyBounds() {
+  const rect = viewport.getBoundingClientRect();
+  const scale = baseScale * zoom;
+
+  const width = IMAGE_WIDTH * scale;
+  const height = IMAGE_HEIGHT * scale;
+
+  // Center the image if it is smaller than the viewport.
+  if (width <= rect.width) {
+    panX = (rect.width - width) / 2;
+  } else {
+    panX = Math.min(0, Math.max(rect.width - width, panX));
+  }
+
+  if (height <= rect.height) {
+    panY = (rect.height - height) / 2;
+  } else {
+    panY = Math.min(0, Math.max(rect.height - height, panY));
+  }
+}
+
+function renderTransform() {
+  const scale = baseScale * zoom;
+
+  world.style.transform =
+    `translate3d(${panX}px,${panY}px,0) scale(${scale})`;
+}
+
+function setZoom(newZoom, centerX, centerY) {
+  const oldScale = baseScale * zoom;
+
+  zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+
+  const newScale = baseScale * zoom;
+
+  const rect = viewport.getBoundingClientRect();
+
+  // Preserve the point under the user's fingers.
+  const cx = centerX ?? rect.width / 2;
+  const cy = centerY ?? rect.height / 2;
+
+  const imageX = (cx - panX) / oldScale;
+  const imageY = (cy - panY) / oldScale;
+
+  panX = cx - imageX * newScale;
+  panY = cy - imageY * newScale;
+
+  applyBounds();
+  renderTransform();
+}
+
+function resetView() {
+  zoom = 1;
+  const rect = viewport.getBoundingClientRect();
+
+  panX = (rect.width - IMAGE_WIDTH * baseScale) / 2;
+  panY = (rect.height - IMAGE_HEIGHT * baseScale) / 2;
+
+  applyBounds();
+  renderTransform();
+}
+
+document.getElementById("zoomIn").addEventListener("click", () => {
+  const rect = viewport.getBoundingClientRect();
+  setZoom(zoom * 1.35, rect.width / 2, rect.height / 2);
+});
+
+document.getElementById("zoomOut").addEventListener("click", () => {
+  const rect = viewport.getBoundingClientRect();
+  setZoom(zoom / 1.35, rect.width / 2, rect.height / 2);
+});
+
+document.getElementById("resetView").addEventListener("click", resetView);
+
+/* Mouse-wheel zoom */
+viewport.addEventListener("wheel", event => {
+  event.preventDefault();
+
+  const rect = viewport.getBoundingClientRect();
+
+  const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+
+  setZoom(
+    zoom * factor,
+    event.clientX - rect.left,
+    event.clientY - rect.top
+  );
+}, { passive: false });
+
+/* =========================================================
+   POINTER GESTURES
+   Supports mouse dragging, touch dragging and pinch zoom.
+   ========================================================= */
+
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function midpoint(a, b) {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2
+  };
+}
+
+viewport.addEventListener("pointerdown", event => {
+  if (!started || completed) return;
+
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+
+  viewport.setPointerCapture(event.pointerId);
+
+  const rect = viewport.getBoundingClientRect();
+
+  pointers.set(event.pointerId, {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+    clientX: event.clientX,
+    clientY: event.clientY
+  });
+
+  if (pointers.size === 1) {
+    const point = pointers.get(event.pointerId);
+
+    gesture = {
+      type: "pan",
+      startX: point.x,
+      startY: point.y,
+      panX,
+      panY,
+      moved: false
+    };
+
+    viewport.classList.add("dragging");
+  } else if (pointers.size === 2) {
+    const points = [...pointers.values()];
+    const mid = midpoint(points[0], points[1]);
+
+    gesture = {
+      type: "pinch",
+      startDistance: distance(points[0], points[1]),
+      startZoom: zoom,
+      startMid: mid,
+      startPanX: panX,
+      startPanY: panY,
+      imageX: (mid.x - panX) / (baseScale * zoom),
+      imageY: (mid.y - panY) / (baseScale * zoom)
+    };
+  }
+});
+
+viewport.addEventListener("pointermove", event => {
+  if (!pointers.has(event.pointerId) || !gesture) return;
+
+  const rect = viewport.getBoundingClientRect();
+
+  const point = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+    clientX: event.clientX,
+    clientY: event.clientY
+  };
+
+  pointers.set(event.pointerId, point);
+
+  if (gesture.type === "pan" && pointers.size === 1) {
+    const dx = point.x - gesture.startX;
+    const dy = point.y - gesture.startY;
+
+    if (Math.abs(dx) + Math.abs(dy) > 5) {
+      gesture.moved = true;
+    }
+
+    panX = gesture.panX + dx;
+    panY = gesture.panY + dy;
+
+    applyBounds();
+    renderTransform();
+
+  } else if (gesture.type === "pinch" && pointers.size >= 2) {
+    const points = [...pointers.values()];
+    const mid = midpoint(points[0], points[1]);
+
+    const currentDistance = distance(points[0], points[1]);
+
+    zoom = Math.max(
+      MIN_ZOOM,
+      Math.min(
+        MAX_ZOOM,
+        gesture.startZoom *
+          (currentDistance / Math.max(gesture.startDistance, 1))
+      )
+    );
+
+    const scale = baseScale * zoom;
+
+    panX = mid.x - gesture.imageX * scale;
+    panY = mid.y - gesture.imageY * scale;
+
+    applyBounds();
+    renderTransform();
+  }
+});
+
+function handlePointerEnd(event) {
+  if (!pointers.has(event.pointerId)) return;
+
+  const point = pointers.get(event.pointerId);
+  const wasSinglePan = gesture && gesture.type === "pan";
+  const wasMoved = gesture && gesture.moved;
+
+  // A tap is a short, stationary single-pointer interaction.
+  if (
+    wasSinglePan &&
+    !wasMoved &&
+    pointers.size === 1 &&
+    started &&
+    !completed
+  ) {
+    const now = Date.now();
+
+    // Avoid processing accidental duplicate pointer events.
+    if (now - lastTapTime > 100) {
+      lastTapTime = now;
+      handleSceneTap(point.x, point.y);
+    }
+  }
+
+  pointers.delete(event.pointerId);
+
+  if (pointers.size === 0) {
+    gesture = null;
+    viewport.classList.remove("dragging");
+  } else if (pointers.size === 1) {
+    const remaining = [...pointers.values()][0];
+
+    gesture = {
+      type: "pan",
+      startX: remaining.x,
+      startY: remaining.y,
+      panX,
+      panY,
+      moved: true
+    };
+  }
+}
+
+viewport.addEventListener("pointerup", handlePointerEnd);
+viewport.addEventListener("pointercancel", handlePointerEnd);
+
+/* =========================================================
+   SCENE HIT DETECTION
+   Convert screen coordinates to image-relative coordinates.
+   ========================================================= */
+
+function handleSceneTap(screenX, screenY) {
+  if (!started || completed) return;
+
+  const scale = baseScale * zoom;
+
+  const imageX = (screenX - panX) / scale;
+  const imageY = (screenY - panY) / scale;
+
+  if (
+    imageX < 0 || imageX > IMAGE_WIDTH ||
+    imageY < 0 || imageY > IMAGE_HEIGHT
+  ) return;
+
+  const xPercent = imageX / IMAGE_WIDTH * 100;
+  const yPercent = imageY / IMAGE_HEIGHT * 100;
+
+  let selected = null;
+  let nearestDistance = Infinity;
+
+  level.objects.forEach((object, index) => {
+    if (found.has(index)) return;
+
+    const dx = (xPercent - object.x) * IMAGE_WIDTH / 100;
+    const dy = (yPercent - object.y) * IMAGE_HEIGHT / 100;
+
+    // Elliptical hit detection accommodates image aspect ratio.
+    const normalizedDistance = Math.sqrt(
+      dx * dx + dy * dy
+    );
+
+    const radius = object.radius / 100 * IMAGE_WIDTH;
+
+    if (
+      normalizedDistance <= radius &&
+      normalizedDistance < nearestDistance
+    ) {
+      selected = index;
+      nearestDistance = normalizedDistance;
+    }
+  });
+
+  if (selected !== null) {
+    findObject(selected, imageX, imageY);
+  } else {
+    showWrongTap(screenX, screenY);
+  }
+}
+
+/* =========================================================
+   FIND OBJECT
+   ========================================================= */
+
+function findObject(index, imageX, imageY) {
+  if (found.has(index)) return;
+
+  found.add(index);
+
+  const object = level.objects[index];
+
+  playFoundSound();
+
+  // Draw the discovery ring in image coordinates.
+  const ring = document.createElement("div");
+  ring.className = "found-ring";
+
+  ring.style.left = object.x / 100 * IMAGE_WIDTH + "px";
+  ring.style.top = object.y / 100 * IMAGE_HEIGHT + "px";
+
+  const diameter = object.radius / 100 * IMAGE_WIDTH * 2;
+
+  ring.style.width = diameter + "px";
+  ring.style.height = diameter + "px";
+
+  world.appendChild(ring);
+
+  renderTargets();
+  updateHUD();
+
+  if (found.size === level.objects.length) {
+    setTimeout(completeLevel, 650);
+  }
+}
+
+/* =========================================================
+   WRONG TAP FEEDBACK
+   ========================================================= */
+
+function showWrongTap(x, y) {
+  viewport.classList.remove("shake");
+
+  // Restart the shake animation.
+  void viewport.offsetWidth;
+
+  viewport.classList.add("shake");
+
+  playWrongSound();
+
+  const feedback = document.createElement("div");
+  feedback.className = "wrong-tap";
+  feedback.textContent = "✕";
+
+  feedback.style.left = x + "px";
+  feedback.style.top = y + "px";
+
+  viewport.appendChild(feedback);
+
+  setTimeout(() => feedback.remove(), 750);
+}
+
+/* =========================================================
+   TARGET LIST AND HUD
+   ========================================================= */
+
+function renderTargets() {
+  targetsEl.innerHTML = "";
+
+  level.objects.forEach((object, index) => {
+    const isFound = found.has(index);
+
+    const item = document.createElement("div");
+    item.className = "target" + (isFound ? " found" : "");
+
+    item.innerHTML = `
+      ${object.img ? '<img class="obj-icon" src="' + object.img + '" alt="">' : '<span class="emoji">' + object.icon + '</span>'}
+      <span class="name">${objName(object)}</span>
+      ${isFound ? '<span class="check">✓</span>' : ""}
+    `;
+
+    item.setAttribute(
+      "aria-label",
+      objName(object) + (isFound ? ", found" : ", not found")
+    );
+
+    targetsEl.appendChild(item);
+  });
+}
+
+function updateHUD() {
+  const count = found.size;
+  const total = level.objects.length;
+
+  levelDisplay.textContent = String(levelIndex + 1).padStart(2, "0");
+  foundDisplay.textContent = `${count}/${total}`;
+  hintDisplay.textContent = hintsRemaining;
+
+  remainingText.textContent =
+    count === total
+      ? T.allFound
+      : T.remaining(total - count);
+
+  hintButtonCount.textContent = hintsRemaining;
+  hintButton.disabled = hintsRemaining <= 0 || count === total;
+}
+
+/* =========================================================
+   HINT SYSTEM
+   Pulses a ring around one remaining object's location.
+   ========================================================= */
+
+function clearHint() {
+  if (hintElement) {
+    hintElement.remove();
+    hintElement = null;
+  }
+}
+
+function showHint() {
+  if (hintsRemaining <= 0 || completed || !started) return;
+
+  const remaining = level.objects
+    .map((object, index) => ({ object, index }))
+    .filter(item => !found.has(item.index));
+
+  if (remaining.length === 0) return;
+
+  hintsRemaining--;
+  updateHUD();
+
+  clearHint();
+
+  // Select an unfound object randomly.
+  const selection =
+    remaining[Math.floor(Math.random() * remaining.length)];
+
+  const object = selection.object;
+
+  const ring = document.createElement("div");
+  ring.className = "hint-ring";
+
+  ring.style.left = object.x / 100 * IMAGE_WIDTH + "px";
+  ring.style.top = object.y / 100 * IMAGE_HEIGHT + "px";
+
+  const diameter = object.radius / 100 * IMAGE_WIDTH * 2.4;
+
+  ring.style.width = diameter + "px";
+  ring.style.height = diameter + "px";
+
+  world.appendChild(ring);
+  hintElement = ring;
+
+  // Briefly zoom towards the hinted object if necessary.
+  const rect = viewport.getBoundingClientRect();
+
+  const desiredZoom = Math.max(zoom, 1.4);
+
+  const objectScreenX =
+    panX + object.x / 100 * IMAGE_WIDTH * baseScale * zoom;
+
+  const objectScreenY =
+    panY + object.y / 100 * IMAGE_HEIGHT * baseScale * zoom;
+
+  if (zoom < desiredZoom) {
+    setZoom(
+      desiredZoom,
+      objectScreenX,
+      objectScreenY
+    );
+  }
+
+  // Pan the target into view without exceeding image bounds.
+  const scale = baseScale * zoom;
+
+  const targetX = object.x / 100 * IMAGE_WIDTH * scale;
+  const targetY = object.y / 100 * IMAGE_HEIGHT * scale;
+
+  panX = rect.width / 2 - targetX;
+  panY = rect.height / 2 - targetY;
+
+  applyBounds();
+  renderTransform();
+
+  setTimeout(clearHint, 3500);
+}
+
+hintButton.addEventListener("click", showHint);
+
+/* =========================================================
+   LEVEL MANAGEMENT
+   ========================================================= */
+
+function loadLevel(index) {
+  levelIndex = index;
+  level = LEVELS[levelIndex];
+
+  IMAGE_WIDTH = level.w;
+  IMAGE_HEIGHT = level.h;
+  world.style.width = IMAGE_WIDTH + "px";
+  world.style.height = IMAGE_HEIGHT + "px";
+  const sceneImg = document.getElementById("scene");
+  if (sceneImg.getAttribute("src") !== level.img) {
+    sceneImg.src = level.img;
+  }
+
+  found = new Set();
+  hintsRemaining = level.hints ?? 3;
+  completed = false;
+
+  clearHint();
+
+  // Remove discovery rings from the previous level.
+  world.querySelectorAll(".found-ring").forEach(el => el.remove());
+
+  resetView();
+  renderTargets();
+  updateHUD();
+
+  completeOverlay.classList.add("hidden");
+}
+
+function completeLevel() {
+  if (completed) return;
+
+  completed = true;
+
+  clearHint();
+
+  playCelebrationSound();
+
+  const isLastLevel = levelIndex === LEVELS.length - 1;
+
+  document.getElementById("completeTitle").textContent =
+    isLastLevel ? T.completeLast : T.completeTitle;
+
+  document.getElementById("completeMessage").textContent =
+    isLastLevel
+      ? T.completeLastMsg
+      : T.completeMsg(level.objects.length);
+
+  document.getElementById("nextButton").textContent =
+    isLastLevel ? T.again : T.next;
+
+  completeOverlay.classList.remove("hidden");
+
+  createConfetti();
+}
+
+function createConfetti() {
+  const symbols = ["✨", "🌟", "🎉", "⭐", "🎊"];
+
+  for (let i = 0; i < 24; i++) {
+    const particle = document.createElement("div");
+
+    particle.className = "confetti";
+    particle.textContent =
+      symbols[Math.floor(Math.random() * symbols.length)];
+
+    particle.style.left = Math.random() * 100 + "%";
+    particle.style.animationDelay = Math.random() * 1.2 + "s";
+
+    completeOverlay.appendChild(particle);
+
+    setTimeout(() => particle.remove(), 4500);
+  }
+}
+
+document.getElementById("nextButton").addEventListener("click", () => {
+  const nextIndex =
+    levelIndex >= LEVELS.length - 1 ? 0 : levelIndex + 1;
+
+  loadLevel(nextIndex);
+});
+
+document.getElementById("replayButton").addEventListener("click", () => {
+  loadLevel(levelIndex);
+});
+
+/* =========================================================
+   START GAME
+   ========================================================= */
+
+document.getElementById("startButton").addEventListener("click", () => {
+  initAudio();
+
+  started = true;
+
+  introOverlay.classList.add("hidden");
+
+  calculateBaseScale();
+  resetView();
+});
+
+window.addEventListener("resize", () => {
+  calculateBaseScale();
+});
+
+window.addEventListener("orientationchange", () => {
+  setTimeout(calculateBaseScale, 150);
+});
+
+/* =========================================================
+   OPTIONAL FULLSCREEN SUPPORT
+   ========================================================= */
+
+async function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (error) {
+    // Fullscreen is optional and may be unavailable in some browsers.
+    console.info("Fullscreen is not available.");
+  }
+}
+
+// Double-tapping the brand toggles fullscreen.
+document.querySelector(".brand").addEventListener("dblclick", toggleFullscreen);
+
+/* =========================================================
+   FOUNDATION (vc2)
+   Tap tolerance, save/progress, sound/vibration settings,
+   monetization placeholders, next-level image preload.
+   ========================================================= */
+
+// Central switches; wire AdMob / Play Billing here later.
+const MONETIZATION = { adsEnabled: false, billingEnabled: false };
+
+function loadJSON(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
+}
+
+const settings = Object.assign({ sound: true, vibration: true }, loadJSON("findit_settings") || {});
+const save = Object.assign({ unlocked: 1, best: {} }, loadJSON("findit_save") || {});
+const START_LEVEL = Math.max(0, Math.min(save.unlocked, LEVELS.length) - 1);
+let levelStartTime = Date.now();
+
+function persistSettings() { lsSet("findit_settings", JSON.stringify(settings)); }
+function persistSave() { lsSet("findit_save", JSON.stringify(save)); }
+
+function vibrate(pattern) {
+  if (settings.vibration && navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch (e) {}
+  }
+}
+
+let toastTimer = null;
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+function showComingSoon() { showToast(T.comingSoon); }
+
+// Gate the sounds behind the sound setting (wrap, originals preserved).
+const _playFoundSound = playFoundSound;
+playFoundSound = function () { if (settings.sound) _playFoundSound(); };
+const _playWrongSound = playWrongSound;
+playWrongSound = function () { if (settings.sound) _playWrongSound(); };
+const _playCelebrationSound = playCelebrationSound;
+playCelebrationSound = function () { if (settings.sound) _playCelebrationSound(); };
+
+// Vibration on found / wrong tap.
+const _findObject = findObject;
+findObject = function (index, imageX, imageY) {
+  _findObject(index, imageX, imageY);
+  vibrate(15);
+};
+const _showWrongTap = showWrongTap;
+showWrongTap = function (x, y) {
+  _showWrongTap(x, y);
+  vibrate([30, 40, 30]);
+};
+
+// Every in-scene tap shows a small white ping.
+function showTapPing(imageX, imageY) {
+  const ping = document.createElement("div");
+  ping.className = "tap-ping";
+  ping.style.left = imageX + "px";
+  ping.style.top = imageY + "px";
+  world.appendChild(ping);
+  setTimeout(() => ping.remove(), 450);
+}
+
+// Tap recognition: generous tolerance, nearest object wins,
+// already-found objects are ignored instead of penalized.
+function handleSceneTap(screenX, screenY) {
+  if (!started || completed) return;
+
+  const scale = baseScale * zoom;
+  const imageX = (screenX - panX) / scale;
+  const imageY = (screenY - panY) / scale;
+
+  if (imageX < 0 || imageX > IMAGE_WIDTH || imageY < 0 || imageY > IMAGE_HEIGHT) return;
+
+  showTapPing(imageX, imageY);
+
+  const xPercent = imageX / IMAGE_WIDTH * 100;
+  const yPercent = imageY / IMAGE_HEIGHT * 100;
+
+  let selected = null;
+  let nearestDistance = Infinity;
+  let tappedFound = false;
+
+  level.objects.forEach((object, index) => {
+    const dx = (xPercent - object.x) * IMAGE_WIDTH / 100;
+    const dy = (yPercent - object.y) * IMAGE_HEIGHT / 100;
+    const normalizedDistance = Math.sqrt(dx * dx + dy * dy);
+
+    // Object radius, but at least 2.5% of image width or ~30 screen px.
+    const radius = Math.max(
+      object.radius / 100 * IMAGE_WIDTH,
+      IMAGE_WIDTH * 0.025,
+      30 / scale
+    );
+
+    if (normalizedDistance <= radius) {
+      if (found.has(index)) { tappedFound = true; return; }
+      if (normalizedDistance < nearestDistance) {
+        selected = index;
+        nearestDistance = normalizedDistance;
+      }
+    }
+  });
+
+  if (selected !== null) {
+    findObject(selected, imageX, imageY);
+  } else if (!tappedFound) {
+    showWrongTap(screenX, screenY);
+  }
+}
+
+// Hint button with 0 hints offers the (placeholder) ad refill instead of dead-ending.
+const _showHint = showHint;
+showHint = function () {
+  if (hintsRemaining <= 0 && started && !completed) {
+    showToast(T.hintRefill);
+    return;
+  }
+  _showHint();
+};
+
+function updateHUD() {
+  const count = found.size;
+  const total = level.objects.length;
+
+  levelDisplay.textContent = String(levelIndex + 1).padStart(2, "0");
+  foundDisplay.textContent = `${count}/${total}`;
+  hintDisplay.textContent = hintsRemaining;
+
+  remainingText.textContent =
+    count === total ? T.allFound : T.remaining(total - count);
+
+  hintButtonCount.textContent = hintsRemaining;
+  hintButton.disabled = count === total;
+  hintButton.classList.toggle("empty", hintsRemaining <= 0);
+}
+
+function loadLevel(index) {
+  levelIndex = index;
+  level = LEVELS[levelIndex];
+
+  IMAGE_WIDTH = level.w;
+  IMAGE_HEIGHT = level.h;
+  world.style.width = IMAGE_WIDTH + "px";
+  world.style.height = IMAGE_HEIGHT + "px";
+  const sceneImg = document.getElementById("scene");
+  if (sceneImg.getAttribute("src") !== level.img) {
+    sceneImg.src = level.img;
+  }
+
+  found = new Set();
+  hintsRemaining = level.hints ?? 3;
+  completed = false;
+  levelStartTime = Date.now();
+
+  clearHint();
+  world.querySelectorAll(".found-ring").forEach(el => el.remove());
+
+  resetView();
+  renderTargets();
+  updateHUD();
+  renderLevelChips();
+
+  completeOverlay.classList.add("hidden");
+
+  // Preload the next level image for an instant transition.
+  const nextLevel = LEVELS[levelIndex + 1];
+  if (nextLevel) { const pre = new Image(); pre.src = nextLevel.img; }
+}
+
+function completeLevel() {
+  if (completed) return;
+
+  completed = true;
+  clearHint();
+  playCelebrationSound();
+  vibrate([40, 60, 40, 60, 90]);
+
+  const elapsed = Math.round((Date.now() - levelStartTime) / 1000);
+  const key = String(levelIndex);
+  if (!save.best[key] || elapsed < save.best[key]) save.best[key] = elapsed;
+  if (levelIndex + 1 < LEVELS.length) {
+    save.unlocked = Math.max(save.unlocked, levelIndex + 2);
+  }
+  persistSave();
+  renderLevelChips();
+
+  const isLastLevel = levelIndex === LEVELS.length - 1;
+
+  document.getElementById("completeTitle").textContent =
+    isLastLevel ? T.completeLast : T.completeTitle;
+
+  document.getElementById("completeMessage").textContent =
+    (isLastLevel ? T.completeLastMsg : T.completeMsg(level.objects.length)) +
+    " " + T.record(elapsed);
+
+  document.getElementById("nextButton").textContent =
+    isLastLevel ? T.again : T.next;
+
+  completeOverlay.classList.remove("hidden");
+  createConfetti();
+}
+
+// Level chips on the start screen (locked beyond progress).
+function renderLevelChips() {
+  const chips = document.getElementById("levelChips");
+  if (!chips) return;
+  chips.innerHTML = "";
+  LEVELS.forEach((lv, i) => {
+    const unlocked = i < save.unlocked;
+    const chip = document.createElement("button");
+    chip.className = "chip" + (unlocked ? "" : " locked") + (i === levelIndex ? " current" : "");
+    const best = save.best[String(i)];
+    chip.innerHTML = unlocked
+      ? String(i + 1) + (best ? "<small>" + best + "s</small>" : "")
+      : "🔒";
+    chip.disabled = !unlocked;
+    chip.addEventListener("click", () => {
+      initAudio();
+      started = true;
+      introOverlay.classList.add("hidden");
+      loadLevel(i);
+      calculateBaseScale();
+      resetView();
+    });
+    chips.appendChild(chip);
+  });
+}
+
+// Settings overlay wiring.
+document.getElementById("settingsButton").addEventListener("click", () => {
+  syncSettingsUI();
+  document.getElementById("settingsOverlay").classList.remove("hidden");
+});
+document.getElementById("settingsClose").addEventListener("click", () => {
+  document.getElementById("settingsOverlay").classList.add("hidden");
+});
+function openSettings(){ syncSettingsUI(); document.getElementById("settingsOverlay").classList.remove("hidden"); }
+function syncSettingsUI() {
+  document.getElementById("soundToggle").textContent = settings.sound ? T.on : T.off;
+  document.getElementById("vibrationToggle").textContent = settings.vibration ? T.on : T.off;
+}
+document.getElementById("soundToggle").addEventListener("click", () => {
+  settings.sound = !settings.sound;
+  persistSettings();
+  syncSettingsUI();
+});
+document.getElementById("vibrationToggle").addEventListener("click", () => {
+  settings.vibration = !settings.vibration;
+  persistSettings();
+  syncSettingsUI();
+});
+document.getElementById("removeAdsRow").addEventListener("click", showComingSoon);
+
+/* =========================================================
+   INITIALIZATION
+   ========================================================= */
+
+// Apply localized static texts
+document.getElementById("introTitle").textContent = T.introTitle;
+document.getElementById("introBody").textContent = T.introBody;
+document.getElementById("startButton").textContent = T.start;
+document.getElementById("replayButton").textContent = T.replay;
+document.getElementById("hintLabel").textContent = T.hint;
+document.getElementById("footerHint").textContent = T.footer;
+document.getElementById("termsTitle").textContent = T.termsTitle;
+document.getElementById("termsBody").textContent = T.termsBody;
+document.getElementById("termsAccept").textContent = T.accept;
+document.getElementById("settingsTitle").textContent = T.settings;
+document.getElementById("soundLabel").textContent = T.sound;
+document.getElementById("vibrationLabel").textContent = T.vibration;
+document.getElementById("removeAdsLabel").textContent = T.removeAds;
+
+// Splash first, then one-time terms, then the intro/start screen.
+const splash = document.getElementById("splashOverlay");
+const termsOverlay = document.getElementById("termsOverlay");
+
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function dismissSplash() {
+  splash.classList.add("fade");
+  setTimeout(() => splash.remove(), 600);
+  if (!lsGet("findit_terms_ok")) {
+    termsOverlay.classList.remove("hidden");
+  }
+}
+setTimeout(dismissSplash, 1700);
+splash.addEventListener("click", dismissSplash);
+
+document.getElementById("termsAccept").addEventListener("click", () => {
+  lsSet("findit_terms_ok", "1");
+  termsOverlay.classList.add("hidden");
+});
+
+loadLevel(START_LEVEL);
+calculateBaseScale();
+
+// Test hooks (internal): #play skips straight into the level, #hint shows a hint ring.
+if (location.hash.indexOf("intro") >= 0) {
+  lsSet("findit_terms_ok", "1");
+  dismissSplash();
+  termsOverlay.classList.add("hidden");
+  showScreen("introScreen");
+}
+if (location.hash.indexOf("play") >= 0) {
+  lsSet("findit_terms_ok", "1");
+  dismissSplash();
+  termsOverlay.classList.add("hidden");
+  introOverlay.classList.add("hidden");
+  started = true;
+  calculateBaseScale();
+  resetView();
+  var lvm = location.hash.match(/lv(\d+)/);
+  if (lvm) { loadLevel(Math.min(LEVELS.length - 1, parseInt(lvm[1], 10) - 1)); }
+  if (location.hash.indexOf("hint") >= 0) { setTimeout(showHint, 400); }
+  if (location.hash.indexOf("found") >= 0) { setTimeout(() => findObject(0, 0, 0), 400); }
+  if (location.hash.indexOf("settings") >= 0) { setTimeout(openSettings, 300); }
+  if (location.hash.indexOf("rings") >= 0) { setTimeout(() => {
+    level.objects.forEach((o) => {
+      const r = document.createElement("div");
+      r.className = "found-ring";
+      r.style.left = o.x / 100 * IMAGE_WIDTH + "px";
+      r.style.top = o.y / 100 * IMAGE_HEIGHT + "px";
+      const d = o.radius / 100 * IMAGE_WIDTH * 2;
+      r.style.width = d + "px"; r.style.height = d + "px"; r.style.animation = "none";
+      world.appendChild(r);
+    });
+  }, 500); }
+}
+
+</script>
+</body>
+</html>
+
