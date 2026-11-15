@@ -19,8 +19,9 @@ Promise.all([
   fetch('2-pack_ext4.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
   fetch('2-pack_ext5.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
   fetch('1-2-pack_ext8.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
-  fetch('2-2-pack_ext9.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
-]).then(([app, ext7, ext6, ext, ext2, ext3, ext4, ext5, ext8, ext9]) => {
+  fetch('2-2-pack_ext9.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
+  fetch('1-pack_icons.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+]).then(([app, ext7, ext6, ext, ext2, ext3, ext4, ext5, ext8, ext9, icons]) => {
   document.open();
   document.write(app);
   document.write('<scr' + 'ipt>' + ext7 + '<\/scr' + 'ipt>');
@@ -32,6 +33,7 @@ Promise.all([
   document.write('<scr' + 'ipt>' + ext5 + '<\/scr' + 'ipt>');
   document.write('<scr' + 'ipt>' + ext8 + '<\/scr' + 'ipt>');
   document.write('<scr' + 'ipt>' + ext9 + '<\/scr' + 'ipt>');
+  document.write('<scr' + 'ipt>' + icons + '<\/scr' + 'ipt>');
   document.write('<scr' + 'ipt>' + "/* vc19 ad gate: ads start at stage AD_START. Inject as final document.write in index.html loader, after all packs. */\n(function () {\n  var AD_START = 5;\n  function banner() { return document.getElementById(\"adBanner\"); }\n  function syncBanner(i) { var b = banner(); if (b) b.style.display = (i + 1 >= AD_START) ? \"\" : \"none\"; }\n  var origLoad = window.loadLevel;\n  window.loadLevel = function (i) { syncBanner(i); return origLoad(i); };\n  var origInter = window.showInterstitial;\n  window.showInterstitial = function (done) {\n    if ((levelIndex + 1) < AD_START) { if (done) done(); return; }\n    return origInter(done);\n  };\n  var b = banner(); if (b) b.style.display = \"none\";\n})();" + '<\/scr' + 'ipt>');
   document.close();
 }).catch(e => { document.body.firstElementChild.textContent = 'Load failed (' + e.message + ') - tap to retry'; document.body.onclick = () => location.reload(); });
