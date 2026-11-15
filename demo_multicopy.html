@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Find It: Multi-Copy Demo</title>
+<style>html,body{margin:0;height:100%;background:#0e1a26}body{display:grid;place-items:center;color:#7f9bb3;font:600 15px/1.4 system-ui,sans-serif}</style>
+</head>
+<body>
+<div>FIND IT &middot; DEMO Loading&hellip;</div>
+<script>
+Promise.all([
+  fetch('1-1-payload_app.html', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
+  fetch('1-pack_icons.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
+  fetch('1-pack_forest.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
+  fetch('2-multicopy.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+]).then(([app, icons, forest, multicopy]) => {
+  document.open();
+  document.write(app);
+  document.write('<scr' + 'ipt>' + icons + '<\/scr' + 'ipt>');
+  document.write('<scr' + 'ipt>' + forest + '<\/scr' + 'ipt>');
+  document.write('<scr' + 'ipt>' + multicopy + '<\/scr' + 'ipt>');
+  document.write('<scr' + 'ipt>' + "/* demo auto-start: skip splash/terms/intro, jump into the forest level */\n(function(){\n  lsSet('findit_terms_ok','1');\n  dismissSplash();\n  termsOverlay.classList.add('hidden');\n  introOverlay.classList.add('hidden');\n  started = true;\n  loadLevel(window.__FOREST_INDEX);\n  calculateBaseScale();\n  resetView();\n})();" + '<\/scr' + 'ipt>');
+  document.close();
+}).catch(e => { document.body.firstElementChild.textContent = 'Load failed (' + e.message + ') - tap to retry'; document.body.onclick = () => location.reload(); });
+</script>
+</body>
+</html>
