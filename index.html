@@ -27,8 +27,9 @@ Promise.all([
   fetch('1-pack_ext12.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
   fetch('2-pack_ext13.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
   fetch('1-pack_ext14.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
-  fetch('1-pack_ext15.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
-]).then(([app, ext7, ext6, ext, ext2, ext3, ext4, ext5, ext8, ext9, icons, uiconfix, ext10, ext11, ext12, ext13, ext14, ext15]) => {
+  fetch('1-pack_ext15.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
+  fetch('1-pack_ext16.js', {cache:'no-cache'}).then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+]).then(([app, ext7, ext6, ext, ext2, ext3, ext4, ext5, ext8, ext9, icons, uiconfix, ext10, ext11, ext12, ext13, ext14, ext15, ext16]) => {
   document.open();
   document.write(app);
   document.write('<scr' + 'ipt>' + ext7 + '<\/scr' + 'ipt>');
@@ -48,6 +49,7 @@ Promise.all([
   document.write('<scr' + 'ipt>' + ext13 + '<\/scr' + 'ipt>');
   document.write('<scr' + 'ipt>' + ext14 + '<\/scr' + 'ipt>');
   document.write('<scr' + 'ipt>' + ext15 + '<\/scr' + 'ipt>');
+  document.write('<scr' + 'ipt>' + ext16 + '<\/scr' + 'ipt>');
   document.write('<scr' + 'ipt>' + "/* vc19 ad gate: ads start at stage AD_START. Inject as final document.write in index.html loader, after all packs. */\n(function () {\n  var AD_START = 5;\n  function banner() { return document.getElementById(\"adBanner\"); }\n  function syncBanner(i) { var b = banner(); if (b) b.style.display = (i + 1 >= AD_START) ? \"\" : \"none\"; }\n  var origLoad = window.loadLevel;\n  window.loadLevel = function (i) { syncBanner(i); return origLoad(i); };\n  var origInter = window.showInterstitial;\n  window.showInterstitial = function (done) {\n    if ((levelIndex + 1) < AD_START) { if (done) done(); return; }\n    return origInter(done);\n  };\n  var b = banner(); if (b) b.style.display = \"none\";\n})();" + '<\/scr' + 'ipt>');
   document.close();
 }).catch(e => { document.body.firstElementChild.textContent = 'Load failed (' + e.message + ') - tap to retry'; document.body.onclick = () => location.reload(); });
